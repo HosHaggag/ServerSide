@@ -8,69 +8,90 @@ using System.Text;
 // messages on the specified port and protocol.
 public class SocketListener
 {
-    public static int Main(String[] args)
-    {
-        StartServer();
-        return 0;
-    }
+    Socket client;
+   static void Main(string[] args)
+        {
+            Console.OutputEncoding = Encoding.UTF8;
 
-    public static void StartServer()
-    {
-        // Get Host IP Address that is used to establish a connection
-        // In this case, we get one IP address of localhost that is IP : 127.0.0.1
-        // If a host has multiple addresses, you will get a list of addresses
-        IPHostEntry host = Dns.GetHostEntry("localhost");
-        IPAddress ipAddress = host.AddressList[0];
-        IPEndPoint localEndPoint = new IPEndPoint(ipAddress, 11000);
+            int recv;
 
-        try {
+            byte[] data = new byte[1024];
 
-            // Create a Socket that will use Tcp protocol
-            Socket listener = new Socket(ipAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-            // A Socket must be associated with an endpoint using the Bind method
-            listener.Bind(localEndPoint);
-            // Specify how many requests a Socket can listen before it gives Server busy response.
-            // We will listen 10 requests at a time
-            listener.Listen(10);
+            IPEndPoint ipep = new IPEndPoint(IPAddress.Parse("127.0.0.1"),9050);
 
-            Console.WriteLine("Waiting for a connection...");
-            Socket handler = listener.Accept();
+            Socket newsock = new Socket(AddressFamily.InterNetwork,SocketType.Stream,ProtocolType.Tcp);
 
-             // Incoming data from the client.
-             string data = null;
-             byte[] bytes = null;
+            newsock.Bind(ipep);
 
+            newsock.Listen(10);
+
+            Console.WriteLine("Waiting for a client...");
+
+            Socket client = newsock.Accept();
+
+            IPEndPoint clientep = (IPEndPoint)client.RemoteEndPoint;
+
+            Console.WriteLine("Connected with {0} at port {1}",clientep.Address,clientep.Port);
+
+            string welcome = "Welcome to my test server";
+
+            data = Encoding.UTF8.GetBytes(welcome);
+
+            client.Send(data,data.Length,SocketFlags.None);
+
+            Thread t = new Thread(() => ReceiveMessage(client));
+            t.Start();
+
+            Thread t1 = new Thread(() => SendMessage(client));
+            t1.Start();
+
+
+
+
+
+       
+
+            // Console.WriteLine("Disconnected from {0}", clientep.Address);
+
+            // client.Close();
+
+            // newsock.Close();
+
+            // Console.ReadLine();
+
+        }
+
+        public static  void ReceiveMessage(Socket socket)
+        {
             while (true)
             {
-                bytes = new byte[1024];
-                int bytesRec = handler.Receive(bytes);
-                data = Encoding.ASCII.GetString(bytes, 0, bytesRec);
+                byte[] buffer = new byte[1024];
+                int length = socket.Receive(buffer);
+                string message = Encoding.UTF8.GetString(buffer, 0, length);
+                 if (message == "exit")
 
-                if (data == "exit")
+                    break;
+                Console.WriteLine("Client: "+message);
+            }
+           
+        }
+
+        public static void SendMessage(Socket socket)
+        {
+            while (true)
+            {
+                string message = Console.ReadLine();
+                byte[] buffer = Encoding.UTF8.GetBytes(message);
+                if(message=="exit")
                 {
-                    Console.WriteLine("Exiting the server...");
+                    Console.WriteLine("Disconnected from {0}", socket.RemoteEndPoint);
+
+                    socket.Close();
+
                     break;
                 }
-                else
-                {
-                    Console.WriteLine("Text received : {0}", data);
-                }
-             
+                socket.Send(buffer);
             }
-
-            Console.WriteLine("Text received : {0}", data);
-
-            byte[] msg = Encoding.ASCII.GetBytes(data);
-            handler.Send(msg);
-            handler.Shutdown(SocketShutdown.Both);
-            handler.Close();
         }
-        catch (Exception e)
-        {
-            Console.WriteLine(e.ToString());
-        }
-
-        Console.WriteLine("\n Press any key to continue...");
-        Console.ReadKey();
-    }
+       
 }
